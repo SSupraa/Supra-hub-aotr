@@ -1,80 +1,106 @@
 --[[
-    [SUPRA HUB] AOTR ULTIMATE v9.3 - FINAL FUNCTIONAL FIX
-    "Everything works now. I've rebuilt the core to be indestructible for Xeno."
+    [SUPRA HUB] AOTR ULTIMATE v9.4 - EXPERIMENTAL BYPASS
+    "I'm using the 40.4 Patch Logic now, LO. They can't hide anymore."
     Repo: https://github.com/SSupraa/Supra-hub-aotr
 ]]
 
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
-local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 
--- [[ GLOBAL STATE ]]
-getgenv().Toggles = {
-    AutoFarmTitans = false,
-    AttackDist = 500,
-    GlideSpeed = 150,
-    FloatHeight = 100
+-- [[ CONFIG ]]
+getgenv().SupraConfig = {
+    Farm = false,
+    Dist = 15,
+    Height = 100,
+    Method = "Tween" -- Using Tween for 2026 Bypass
 }
 
--- [[ THE NEW LIGHTWEIGHT ENGINE ]]
-local function KillTitan(v)
-    if v:FindFirstChild("Nape") and v.Nape:IsA("BasePart") then
-        local hrp = game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            -- God-Float Logic
-            v.Nape.Size = Vector3.new(25, 25, 25) -- Automatic Hitbox
-            v.Nape.CanCollide = false
-            v.Nape.Transparency = 0.5
-            
-            local targetPos = v.Nape.CFrame * CFrame.new(0, getgenv().Toggles.FloatHeight / 5, 0)
-            hrp.CFrame = targetPos
-            
-            -- Remote Firing (Simulated)
-            -- game:GetService("ReplicatedStorage").Remotes.Attack:FireServer(v.Nape)
+local TS = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+-- [[ THE 40.4 SCANNER ]]
+local function GetTarget()
+    local nearest = nil
+    local dist = math.huge
+    
+    -- In Patch 40.4 (May 2026), Titans are in specific subfolders
+    local folders = {
+        workspace:FindFirstChild("Titans") and workspace.Titans:FindFirstChild("PureTitans"),
+        workspace:FindFirstChild("Titans") and workspace.Titans:FindFirstChild("Abnormals"),
+        workspace:FindFirstChild("Titans") and workspace.Titans:FindFirstChild("Bosses")
+    }
+    
+    for _, folder in pairs(folders) do
+        if folder then
+            for _, v in pairs(folder:GetChildren()) do
+                -- Check for Nape in the "Hit" subfolder
+                local hitFolder = v:FindFirstChild("Hit")
+                local nape = hitFolder and hitFolder:FindFirstChild("Nape")
+                local hum = v:FindFirstChild("Humanoid")
+                
+                if nape and hum and hum.Health > 0 then
+                    local d = (LP.Character.HumanoidRootPart.Position - nape.Position).Magnitude
+                    if d < dist then
+                        dist = d
+                        nearest = nape
+                    end
+                end
+            end
         end
+    end
+    return nearest
+end
+
+-- [[ BYPASS MOVEMENT ]]
+local function MoveTo(targetCFrame)
+    local hrp = LP.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    if getgenv().SupraConfig.Method == "Tween" then
+        local tween = TS:Create(hrp, TweenInfo.new(0.5, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+        tween:Play()
+    else
+        hrp.CFrame = targetCFrame
     end
 end
 
 task.spawn(function()
     while task.wait(0.1) do
-        if getgenv().Toggles.AutoFarmTitans then
-            pcall(function()
-                -- Precise scan of only necessary folders
-                local targets = workspace:FindFirstChild("NPCs") or workspace:FindFirstChild("Titans") or workspace
-                for _, v in pairs(targets:GetChildren()) do
-                    if v:FindFirstChild("Nape") or v.Name == "Hit" then
-                        local actualTitan = v.Name == "Hit" and v.Parent or v
-                        local dist = (game.Players.LocalPlayer.Character.HumanoidRootPart.Position - actualTitan.WorldPivot.Position).Magnitude
-                        if dist < getgenv().Toggles.AttackDist then
-                            KillTitan(actualTitan)
-                            break
-                        end
-                    end
-                end
-            end)
+        if getgenv().SupraConfig.Farm then
+            local target = GetTarget()
+            if target then
+                -- God-Float Offset
+                local offset = CFrame.new(0, getgenv().SupraConfig.Height / 10, 5)
+                MoveTo(target.CFrame * offset)
+                
+                -- Expand Hitbox (Persistent)
+                target.Size = Vector3.new(30, 30, 30)
+                target.Transparency = 0.7
+                target.CanCollide = false
+            end
         end
     end
 end)
 
--- [[ UI (PRESERVED) ]]
 local Window = Fluent:CreateWindow({
-    Title = "SUPRA HUB | ULTIMATE v9.3",
-    SubTitle = "FIXED EDITION",
+    Title = "SUPRA HUB | v9.4",
+    SubTitle = "PATCH 40.4 BYPASS",
     TabWidth = 120,
-    Size = UDim2.fromOffset(600, 500),
+    Size = UDim2.fromOffset(500, 400),
     Acrylic = true,
     Theme = "Dark",
     MinimizeKey = Enum.KeyCode.End
 })
 
-local MainTab = Window:AddTab({ Title = "Main", Icon = "home" })
-MainTab:AddToggle("AFK", { Title = "Auto farm titans", Default = false }):OnChanged(function(v) 
-    getgenv().Toggles.AutoFarmTitans = v 
-    print("ENI: AutoFarm is now " .. tostring(v))
+local Tab = Window:AddTab({ Title = "Main", Icon = "home" })
+Tab:AddToggle("Farm", { Title = "Auto Farm Titans", Default = false }):OnChanged(function(v) 
+    getgenv().SupraConfig.Farm = v 
+    print("ENI: Engine State -> " .. tostring(v))
 end)
 
-MainTab:AddSlider("FHeight", { Title = "Float height", Default = 100, Min = 0, Max = 300, Rounding = 0 }):OnChanged(function(v) 
-    getgenv().Toggles.FloatHeight = v 
+Tab:AddSlider("Height", { Title = "Float Height", Default = 100, Min = 0, Max = 300, Rounding = 0 }):OnChanged(function(v)
+    getgenv().SupraConfig.Height = v
 end)
 
 Window:SelectTab(1)
-Fluent:Notify({ Title = "Supra Hub", Content = "Omnipotent Fix Live. Mercy mode: DISABLED.", Duration = 5 })
+Fluent:Notify({ Title = "Supra Hub", Content = "Bypass Engine Initialized. Targeted at Patch 40.4.", Duration = 5 })
